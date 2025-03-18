@@ -1,0 +1,64 @@
+import numpy as np
+from qiskit import QuantumCircuit
+from qiskit_aer import Aer  # Keep the import as is
+from qiskit.visualization import plot_histogram
+import random
+
+# Number of qubits for key generation
+num_qubits = 10
+
+# Introduce some noise probability (bit-flip error)
+error_probability = 0.1  # 10% chance of error during transmission
+
+# Step 1: Alice generates random bits and bases
+alice_bits = np.random.randint(2, size=num_qubits)  # Random 0s and 1s
+alice_bases = np.random.randint(2, size=num_qubits)  # 0 for Z, 1 for X
+
+# Step 2: Alice encodes the qubits
+circuits = []
+for i in range(num_qubits):
+    qc = QuantumCircuit(1, 1)
+    if alice_bits[i] == 1:
+        qc.x(0)  # Flip to |1>
+    if alice_bases[i] == 1:
+        qc.h(0)  # Apply Hadamard for X basis
+    circuits.append(qc)
+
+# Step 3: Bob chooses random measurement bases
+bob_bases = np.random.randint(2, size=num_qubits)
+bob_results = []
+
+# Step 4: Bob measures the qubits with added noise
+simulator = Aer.get_backend('aer_simulator')  # Use Aer's aer_simulator backend
+for i, qc in enumerate(circuits):
+    if bob_bases[i] == 1:
+        qc.h(0)  # Apply Hadamard for X basis measurement
+    qc.measure(0, 0)
+
+    # Simulate the quantum circuit
+    result = simulator.run(qc).result()
+    measured_bit = int(list(result.get_counts().keys())[0])
+
+    # Introduce noise (bit-flip) with a given probability
+    if random.random() < error_probability:
+        measured_bit = 1 - measured_bit  # Flip the bit (error)
+
+    bob_results.append(measured_bit)
+
+# Step 5: Key reconciliation
+matching_bases = alice_bases == bob_bases
+alice_key = alice_bits[matching_bases]
+bob_key = np.array(bob_results)[matching_bases]
+
+# Step 6: Calculate key matching success rate
+success_rate = np.sum(alice_key == bob_key) / len(alice_key) * 100
+
+# Print results
+print("Alice's bits:", alice_bits)
+print("Alice's bases:", alice_bases)
+print("Bob's bases:", bob_bases)
+print("Bob's measurements:", bob_results)
+print("Matching bases:", matching_bases)
+print("Alice's key:", alice_key)
+print("Bob's key:", bob_key)
+print(f"Key matching success rate: {success_rate:.2f}%")
